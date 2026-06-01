@@ -1,0 +1,58 @@
+.app-shell {
+  min-height: 100vh;
+}
+
+.top-hero {
+  background:
+    radial-gradient(circle at 12% 20%, rgba(255, 255, 255, 0.3) 0, transparent 26%),
+    radial-gradient(circle at 82% 10%, rgba(255, 225, 168, 0.38) 0, transparent 22%),
+    linear-gradient(120deg, #0b3c5d 0%, #1d5f7a 52%, #3d8ba7 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.brand-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.2rem;
+  color: #0b3c5d;
+  background: #f6d55c;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.role-chip {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.brand-logo {
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.stat-card {
+  background: linear-gradient(165deg, #ffffff 0%, #f4f8fb 100%);
+}
+
+.table > :not(caption) > * > * {
+  vertical-align: middle;
+}
+
+@media (max-width: 768px) {
+  .brand-logo {
+    width: 58px;
+    height: 58px;
+  }
+
+  .role-chip {
+    width: 100%;
+    text-align: center;
+  }
+}
