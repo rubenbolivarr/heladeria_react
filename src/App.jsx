@@ -616,7 +616,6 @@ function App() {
             <div className="row g-4 align-items-end">
               <div className="col-lg-7">
                 <h2 className="h4 mb-2">Login</h2>
-                <p className="text-secondary mb-0">Autenticacion por tabla users segun el manual.</p>
               </div>
               <div className="col-lg-5">
                 {userSesion ? (
