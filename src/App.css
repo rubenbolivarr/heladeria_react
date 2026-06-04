@@ -41,6 +41,21 @@
   background: linear-gradient(165deg, #ffffff 0%, #f4f8fb 100%);
 }
 
+.product-card {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 251, 255, 0.98) 100%);
+  border: 1px solid rgba(13, 110, 253, 0.08);
+  box-shadow: 0 18px 40px rgba(11, 60, 93, 0.08);
+}
+
+.product-card-header {
+  background: linear-gradient(135deg, rgba(13, 110, 253, 0.1), rgba(89, 123, 199, 0.08));
+  border: 1px solid rgba(13, 110, 253, 0.12);
+}
+
+.product-card-title {
+  color: #0b3c5d;
+}
+
 .table > :not(caption) > * > * {
   vertical-align: middle;
 }

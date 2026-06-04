@@ -647,7 +647,9 @@ function App() {
 
         <MessageAlert mensaje={mensaje} />
 
-        <Stats ventasHoy={ventasHoy} productoMasRentable={productoMasRentable} productoMasVendido={productoMasVendido} permisos={permisos} anyDisponible={anyDisponible} />
+        {userSesion ? (
+          <Stats ventasHoy={ventasHoy} productoMasRentable={productoMasRentable} productoMasVendido={productoMasVendido} permisos={permisos} anyDisponible={anyDisponible} />
+        ) : null}
 
         {rolActual === 'admin' ? (
           <div className="mb-4 d-flex">
