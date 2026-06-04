@@ -645,7 +645,7 @@ function App() {
       <main className="container">
         <LoginForm userSesion={userSesion} loginForm={loginForm} setLoginForm={setLoginForm} manejarLogin={manejarLogin} cerrarSesion={cerrarSesion} />
 
-        <MessageAlert mensaje={mensaje} />
+        <MessageAlert mensaje={mensaje} onDismiss={() => setMensaje({ tipo: '', texto: '' })} />
 
         {userSesion ? (
           <Stats ventasHoy={ventasHoy} productoMasRentable={productoMasRentable} productoMasVendido={productoMasVendido} permisos={permisos} anyDisponible={anyDisponible} />
