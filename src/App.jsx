@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import logoHeladeria from './assets/logo-heladeria.svg'
 import { isSupabaseConfigured, supabase } from './lib/supabaseClient'
 import './App.css'
+import Header from './components/Header'
+import LoginForm from './components/LoginForm'
+import MessageAlert from './components/MessageAlert'
+import Stats from './components/Stats'
+import OperationsPanel from './components/OperationsPanel'
+import ProductsTable from './components/ProductsTable'
+import IngredientsCrud from './components/IngredientsCrud'
+import SalesLog from './components/SalesLog'
 
 const fallbackUsers = [
   { id: 1, nombre: 'Administrador', correo: 'admin@admin.co', password: 'admin', rol: 'admin' },
@@ -192,14 +200,52 @@ function App() {
   }
 
   const productoMasRentable = useMemo(() => {
-    return productos.reduce((mejor, producto) => {
+    // Preferir productos que estén disponibles (inventario > 0).
+    let mejor = null
+    for (const producto of productos) {
+      const metrica = calcularMetricasProducto(producto)
+      if (!metrica.disponible) continue
+      if (!mejor || metrica.rentabilidad > mejor.rentabilidad) {
+        mejor = { producto, rentabilidad: metrica.rentabilidad }
+      }
+    }
+    if (mejor) return mejor
+
+    // Si ninguno está disponible, devolver el de mayor rentabilidad entre todos.
+    for (const producto of productos) {
       const metrica = calcularMetricasProducto(producto)
       if (!mejor || metrica.rentabilidad > mejor.rentabilidad) {
-        return { producto, rentabilidad: metrica.rentabilidad }
+        mejor = { producto, rentabilidad: metrica.rentabilidad }
       }
-      return mejor
-    }, null)
+    }
+    return mejor
   }, [productos, ingredientesPorId])
+
+  const anyDisponible = useMemo(() => {
+    return productos.some((p) => calcularMetricasProducto(p).disponible)
+  }, [productos, ingredientesPorId])
+
+  const productoMasVendido = useMemo(() => {
+    if (!ventas || ventas.length === 0) return null
+    const counts = ventas.reduce((acc, v) => {
+      const id = v.producto_id
+      acc[id] = (acc[id] || 0) + Number(v.cantidad || 1)
+      return acc
+    }, {})
+    let bestId = null
+    let bestCount = 0
+    for (const idStr of Object.keys(counts)) {
+      const c = counts[idStr]
+      if (c > bestCount) {
+        bestCount = c
+        bestId = Number(idStr)
+      }
+    }
+    const producto = productos.find((p) => p.id === bestId) || null
+    return producto ? { producto, cantidad: bestCount } : null
+  }, [ventas, productos])
+
+  const [showSalesLog, setShowSalesLog] = useState(false)
 
   const buscarProductoPorId = (idTexto) => {
     const id = Number(idTexto)
@@ -594,143 +640,30 @@ function App() {
 
   return (
     <div className="app-shell pb-5">
-      <header className="top-hero py-4 py-md-5 mb-4">
-        <div className="container">
-          <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <div className="d-flex align-items-center gap-3">
-              <img src={logoHeladeria} alt="Logo Heladeria Sierra Dulce" className="brand-logo" />
-              <div>
-                <div className="brand-badge mb-2">NEVADO ANDINO</div>
-                <h1 className="display-6 fw-bold text-white mb-2">Heladeria Sierra Dulce</h1>
-                <p className="text-white-50 mb-0">{usingFallback ? 'Modo local (sin .env)' : 'Conectado a Supabase'}</p>
-              </div>
-            </div>
-            <div className="role-chip">Rol actual: {rolActual}</div>
-          </div>
-        </div>
-      </header>
+      <Header logoHeladeria={logoHeladeria} usingFallback={usingFallback} rolActual={rolActual} />
 
       <main className="container">
-        <section className="card shadow-sm border-0 mb-4">
-          <div className="card-body p-4">
-            <div className="row g-4 align-items-end">
-              <div className="col-lg-7">
-                <h2 className="h4 mb-2">Login</h2>
-              </div>
-              <div className="col-lg-5">
-                {userSesion ? (
-                  <div className="d-grid">
-                    <button type="button" className="btn btn-outline-danger" onClick={cerrarSesion}>Cerrar sesion ({userSesion.nombre})</button>
-                  </div>
-                ) : (
-                  <form className="row g-2" onSubmit={manejarLogin}>
-                    <div className="col-12 col-md-6"><input type="email" className="form-control" value={loginForm.correo} placeholder="Correo" onChange={(event) => setLoginForm((prev) => ({ ...prev, correo: event.target.value }))} required /></div>
-                    <div className="col-12 col-md-4"><input type="password" className="form-control" value={loginForm.password} placeholder="Contrasena" onChange={(event) => setLoginForm((prev) => ({ ...prev, password: event.target.value }))} required /></div>
-                    <div className="col-12 col-md-2 d-grid"><button type="submit" className="btn btn-primary">Entrar</button></div>
-                  </form>
-                )}
-              </div>
-            </div>
+        <LoginForm userSesion={userSesion} loginForm={loginForm} setLoginForm={setLoginForm} manejarLogin={manejarLogin} cerrarSesion={cerrarSesion} />
+
+        <MessageAlert mensaje={mensaje} />
+
+        <Stats ventasHoy={ventasHoy} productoMasRentable={productoMasRentable} productoMasVendido={productoMasVendido} permisos={permisos} anyDisponible={anyDisponible} />
+
+        {rolActual === 'admin' ? (
+          <div className="mb-4 d-flex">
+            <button type="button" className="btn btn-outline-primary" onClick={() => setShowSalesLog(true)}>Ver registro de ventas</button>
           </div>
-        </section>
+        ) : null}
 
-        {mensaje.texto ? <div className={`alert alert-${mensaje.tipo || 'info'} mb-4`}>{mensaje.texto}</div> : null}
-
-        <section className="row g-3 mb-4">
-          <div className="col-md-4"><article className="card border-0 shadow-sm h-100 stat-card"><div className="card-body"><p className="mb-1 text-secondary">Ventas del dia</p><h3 className="h2 mb-0">{ventasHoy.cantidad}</h3></div></article></div>
-          <div className="col-md-4"><article className="card border-0 shadow-sm h-100 stat-card"><div className="card-body"><p className="mb-1 text-secondary">Total vendido</p><h3 className="h2 mb-0">${ventasHoy.total.toLocaleString('es-CO')}</h3></div></article></div>
-          <div className="col-md-4"><article className="card border-0 shadow-sm h-100 stat-card"><div className="card-body"><p className="mb-1 text-secondary">Producto mas rentable</p><h3 className="h6 mb-0">{permisos.verRentabilidad && productoMasRentable ? `${productoMasRentable.producto.nombre} ($${productoMasRentable.rentabilidad.toLocaleString('es-CO')})` : 'Visible solo para admin'}</h3></div></article></div>
-        </section>
+        {showSalesLog ? <SalesLog ventas={ventas} productos={productos} users={users} onClose={() => setShowSalesLog(false)} /> : null}
 
         {permisos.verPanelOperaciones ? (
-          <section className="card border-0 shadow-sm mb-4">
-            <div className="card-body p-4">
-              <h2 className="h4 mb-3">Operaciones obligatorias</h2>
-              <div className="row g-3 mb-3">
-                <div className="col-md-3"><input className="form-control" placeholder="ID producto" value={operacionForm.productoId} onChange={(event) => setOperacionForm((prev) => ({ ...prev, productoId: event.target.value }))} /></div>
-                <div className="col-md-5"><input className="form-control" placeholder="Nombre producto" value={operacionForm.productoNombre} onChange={(event) => setOperacionForm((prev) => ({ ...prev, productoNombre: event.target.value }))} /></div>
-                <div className="col-md-4 d-grid d-md-flex gap-2 flex-wrap"><button type="button" className="btn btn-outline-primary btn-sm" onClick={() => manejarOperacion('producto-por-id')}>Producto por ID</button><button type="button" className="btn btn-outline-primary btn-sm" onClick={() => manejarOperacion('producto-por-nombre')}>Producto por nombre</button></div>
-                <div className="col-md-12 d-grid d-md-flex gap-2 flex-wrap"><button type="button" className="btn btn-outline-success btn-sm" onClick={() => manejarOperacion('calorias-por-id')}>Calorias por ID</button>{permisos.verCosto ? <button type="button" className="btn btn-outline-success btn-sm" onClick={() => manejarOperacion('costo-por-id')}>Costo por ID</button> : null}{permisos.verRentabilidad ? <button type="button" className="btn btn-outline-success btn-sm" onClick={() => manejarOperacion('rentabilidad-por-id')}>Rentabilidad por ID</button> : null}{permisos.vender ? <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => manejarOperacion('vender-por-id')}>Vender por ID</button> : null}</div>
-              </div>
-
-              {permisos.gestionarIngredientes ? (
-                <div className="row g-3 mb-2 border-top pt-3">
-                  <div className="col-md-3"><input className="form-control" placeholder="ID ingrediente" value={operacionForm.ingredienteId} onChange={(event) => setOperacionForm((prev) => ({ ...prev, ingredienteId: event.target.value }))} /></div>
-                  <div className="col-md-5"><input className="form-control" placeholder="Nombre ingrediente" value={operacionForm.ingredienteNombre} onChange={(event) => setOperacionForm((prev) => ({ ...prev, ingredienteNombre: event.target.value }))} /></div>
-                  <div className="col-md-4 d-grid d-md-flex gap-2 flex-wrap"><button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => manejarOperacion('ingrediente-por-id')}>Ingrediente por ID</button><button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => manejarOperacion('ingrediente-por-nombre')}>Ingrediente por nombre</button></div>
-                  <div className="col-md-12 d-grid d-md-flex gap-2 flex-wrap"><button type="button" className="btn btn-outline-dark btn-sm" onClick={() => manejarOperacion('ingrediente-sano-por-id')}>Es sano por ID</button><button type="button" className="btn btn-outline-dark btn-sm" onClick={() => manejarOperacion('reabastecer-por-id')}>Reabastecer por ID</button><button type="button" className="btn btn-outline-dark btn-sm" onClick={() => manejarOperacion('renovar-por-id')}>Renovar por ID</button></div>
-                </div>
-              ) : null}
-
-              {opResultado ? <div className="alert alert-info mt-3 mb-0">{opResultado}</div> : null}
-            </div>
-          </section>
+          <OperationsPanel permisos={permisos} operacionForm={operacionForm} setOperacionForm={setOperacionForm} manejarOperacion={manejarOperacion} opResultado={opResultado} />
         ) : null}
 
-        <section className="card border-0 shadow-sm mb-4">
-          <div className="card-body p-4">
-            <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2"><h2 className="h4 m-0">Listado de productos</h2><span className="badge text-bg-light">Visible para publico</span></div>
-            <div className="table-responsive">
-              <table className="table align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Producto</th><th>Tipo</th><th>Ingredientes</th><th>Precio publico</th>{permisos.verCalorias ? <th>Calorias</th> : null}{permisos.verCosto ? <th>Costo</th> : null}{permisos.verRentabilidad ? <th>Rentabilidad</th> : null}<th>Inventario</th>{permisos.vender ? <th>Venta</th> : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {productos.map((producto) => {
-                    const metrica = calcularMetricasProducto(producto)
-                    return (
-                      <tr key={producto.id}>
-                        <td><strong>{producto.nombre}</strong></td>
-                        <td>{producto.tipo === 'copa' ? `Copa (${producto.vaso})` : `Malteada (${producto.volumen_onzas} oz)`}</td>
-                        <td>{metrica.listaIngredientes.map((item) => item.nombre).join(', ')}</td>
-                        <td>${Number(producto.precio_publico).toLocaleString('es-CO')}</td>
-                        {permisos.verCalorias ? <td>{metrica.calorias} kcal</td> : null}
-                        {permisos.verCosto ? <td>${metrica.costo.toLocaleString('es-CO')}</td> : null}
-                        {permisos.verRentabilidad ? <td>${metrica.rentabilidad.toLocaleString('es-CO')}</td> : null}
-                        <td><span className={`badge ${metrica.disponible ? 'text-bg-success' : 'text-bg-danger'}`}>{metrica.disponible ? 'Disponible' : 'Agotado'}</span></td>
-                        {permisos.vender ? <td><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => venderProducto(producto)} disabled={!metrica.disponible}>Vender</button></td> : null}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+        <ProductsTable productos={productos} calcularMetricasProducto={calcularMetricasProducto} permisos={permisos} venderProducto={venderProducto} rolActual={rolActual} />
 
-        {permisos.gestionarIngredientes ? (
-          <section className="card border-0 shadow-sm mb-4">
-            <div className="card-body p-4">
-              <h2 className="h4 m-0 mb-3">CRUD de ingredientes</h2>
-              <form className="row g-2 mb-4" onSubmit={manejarGuardarIngrediente}>
-                <div className="col-md-3"><input className="form-control" placeholder="Nombre" value={ingredienteForm.nombre} onChange={(event) => setIngredienteForm((prev) => ({ ...prev, nombre: event.target.value }))} required /></div>
-                <div className="col-md-2"><input type="number" className="form-control" placeholder="Precio" value={ingredienteForm.precio} onChange={(event) => setIngredienteForm((prev) => ({ ...prev, precio: event.target.value }))} required /></div>
-                <div className="col-md-2"><input type="number" className="form-control" placeholder="Calorias" value={ingredienteForm.calorias} onChange={(event) => setIngredienteForm((prev) => ({ ...prev, calorias: event.target.value }))} required /></div>
-                <div className="col-md-2"><input type="number" className="form-control" placeholder="Inventario" value={ingredienteForm.inventario} onChange={(event) => setIngredienteForm((prev) => ({ ...prev, inventario: event.target.value }))} required /></div>
-                <div className="col-md-3"><select className="form-select" value={ingredienteForm.tipo} onChange={(event) => setIngredienteForm((prev) => ({ ...prev, tipo: event.target.value }))}><option value="base">Base</option><option value="complemento">Complemento</option></select></div>
-                <div className="col-md-3"><input className="form-control" placeholder="Sabor (solo base)" value={ingredienteForm.sabor} disabled={ingredienteForm.tipo !== 'base'} onChange={(event) => setIngredienteForm((prev) => ({ ...prev, sabor: event.target.value }))} /></div>
-                <div className="col-md-3 d-flex gap-3 align-items-center"><div className="form-check"><input className="form-check-input" type="checkbox" id="vegetariano" checked={ingredienteForm.es_vegetariano} onChange={(event) => setIngredienteForm((prev) => ({ ...prev, es_vegetariano: event.target.checked }))} /><label className="form-check-label" htmlFor="vegetariano">Vegetariano</label></div><div className="form-check"><input className="form-check-input" type="checkbox" id="sano" checked={ingredienteForm.es_sano} onChange={(event) => setIngredienteForm((prev) => ({ ...prev, es_sano: event.target.checked }))} /><label className="form-check-label" htmlFor="sano">Sano</label></div></div>
-                <div className="col-md-6 d-grid d-md-flex gap-2"><button type="submit" className="btn btn-primary">{ingredienteEditId ? 'Actualizar ingrediente' : 'Crear ingrediente'}</button>{ingredienteEditId ? <button type="button" className="btn btn-outline-secondary" onClick={resetearFormularioIngrediente}>Cancelar</button> : null}</div>
-              </form>
-
-              <div className="table-responsive">
-                <table className="table table-striped align-middle mb-0">
-                  <thead><tr><th>Nombre</th><th>Tipo</th><th>Precio</th><th>Calorias</th><th>Inventario</th><th>Vegetariano</th><th>Sano</th><th>Acciones</th></tr></thead>
-                  <tbody>
-                    {ingredientes.map((ingrediente) => (
-                      <tr key={ingrediente.id}>
-                        <td>{ingrediente.nombre}</td><td>{ingrediente.tipo}</td><td>${Number(ingrediente.precio).toLocaleString('es-CO')}</td><td>{ingrediente.calorias}</td><td>{ingrediente.inventario}</td><td>{ingrediente.es_vegetariano ? 'Si' : 'No'}</td><td>{ingrediente.es_sano ? 'Si' : 'No'}</td>
-                        <td><div className="d-flex flex-wrap gap-2"><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => editarIngrediente(ingrediente)}>Editar</button><button type="button" className="btn btn-sm btn-outline-danger" onClick={() => eliminarIngrediente(ingrediente.id)}>Eliminar</button><button type="button" className="btn btn-sm btn-outline-success" onClick={() => reabastecerIngrediente(ingrediente.id)}>Reabastecer</button><button type="button" className="btn btn-sm btn-outline-dark" onClick={() => renovarInventario(ingrediente.id)}>Renovar</button></div></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-        ) : null}
+        <IngredientsCrud permisos={permisos} ingredienteForm={ingredienteForm} setIngredienteForm={setIngredienteForm} ingredienteEditId={ingredienteEditId} manejarGuardarIngrediente={manejarGuardarIngrediente} editarIngrediente={editarIngrediente} eliminarIngrediente={eliminarIngrediente} reabastecerIngrediente={reabastecerIngrediente} renovarInventario={renovarInventario} ingredientes={ingredientes} />
       </main>
     </div>
   )
